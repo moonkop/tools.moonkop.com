@@ -1,27 +1,77 @@
 <?php
+
+function failure($code, $msg)
+{
+    echo json_encode(
+        array('code' => $code,
+            'msg' => $msg,
+        ));
+    exit();
+}
+
+function success($successFileNames)
+{
+    global $target_dir;
+    $returnUrls=array();
+
+    foreach ($successFileNames as $item) {
+        $url = 'http://'.$_SERVER['HTTP_HOST'] .'/'. $target_dir.$item;
+        $returnUrls[] = $url;
+    }
+    echo json_encode(array('code' => '100',
+        'payload'=>array(
+            'urls' => $returnUrls
+        )
+    ));
+    exit();
+}
+
+function getRandomNum()
+{
+    return rand(10000, 99999);
+}
 $target_dir = "upload/";
-$target_file = $target_dir . basename($_FILES["fileToUpload"]["name"]);
-$uploadOk = 1;
-// Check if file already exists
-if (file_exists($target_file)) {
-    echo "Sorry, file already exists.";
-    $uploadOk = 0;
-}
-// Check file size
-if ($_FILES["fileToUpload"]["size"] > 50000000) {
-    echo "Sorry, your file is too large.";
-    $uploadOk = 0;
-}
-// Check if $uploadOk is set to 0 by an error
-if ($uploadOk == 0) {
-    echo "Sorry, your file was not uploaded.";
-// if everything is ok, try to upload file
-} else {
-    if (move_uploaded_file($_FILES["fileToUpload"]["tmp_name"], $target_file)) {
-        echo "The file ". basename( $_FILES["fileToUpload"]["name"]). " has been uploaded.";
-	header("location:/upload/");
+function main()
+{
+    $cover = $_REQUEST['cover'];
+    $singleDir = $_REQUEST['singleDir'];
+
+  global $target_dir;
+
+    if ($singleDir) {
+        $target_dir .= time();
+    }
+
+    $existFiles = array();
+    for ($i = 0; $i < count($_FILES["fileToUpload"]['error']); $i++) {
+        $target_file = $target_dir . basename($_FILES["fileToUpload"]["name"][$i]);
+        if (file_exists($target_file)) {
+            $existFiles[] = $_FILES["fileToUpload"]["name"][$i];
+        }
+    }
+
+    if (count($existFiles) != 0) {
+        failure('500', join(",", $existFiles) . '人家已经有了呢');
     } else {
-        echo "Sorry, there was an error uploading your file.";
+        $successFiles = array();
+        $moveErrorNames = array();
+        for ($i = 0; $i < count($_FILES["fileToUpload"]['error']); $i++) {
+            $target_file = $target_dir . basename($_FILES["fileToUpload"]["name"][$i]);
+            if (!move_uploaded_file($_FILES["fileToUpload"]["tmp_name"][$i], $target_file)) {
+                $moveErrorNames[] = $_FILES["fileToUpload"]["name"][$i];
+            } else {
+                $successFiles[] = $_FILES["fileToUpload"]["name"][$i];
+            }
+        }
+
+        if (count($moveErrorNames) == 0) {
+            success($successFiles);
+        } else {
+            failure('206', '有一部分成功进来辣，但是' . join(',', $moveErrorNames) . '失败了呢');
+        }
     }
 }
+
+main();
+
 ?>
