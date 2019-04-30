@@ -1,158 +1,163 @@
 <head>
-	<title>
-		拖上来吧
+  <title>
+    拖上来吧
 
-	</title>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width,initial-scale=1">
+  </title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
 
-	<script src="http://libs.baidu.com/jquery/2.0.0/jquery.js"></script>
-	<script src="https://cdn.bootcss.com/clipboard.js/2.0.4/clipboard.js"></script>
-	<script>
-
-
-        $(document).ready(function () {
+  <script src="http://libs.baidu.com/jquery/2.0.0/jquery.js"></script>
+  <script src="https://cdn.bootcss.com/clipboard.js/2.0.4/clipboard.js"></script>
+  <script>
 
 
+    $(document).ready(function(){
+      let resetTimer = 0;
+      $(".dropBox").on("dragenter",function(e){
+        clearTimeout(resetTimer);
+        $('.dropBox-text').html("<div>啊~疼~😭</div>");
+      })
+      $(".dropBox").on("dragleave",function(e){
+        $('.dropBox-text').html("<div>吓死宝宝了~😣</div>");
+        clearTimeout(resetTimer);
+        resetTimer = setTimeout(() => {
+          $('.dropBox-text').html("<div>拖进来吧</div>");
+        },1500)
+      })
+      $(".dropBox").on("drop",function(e){
+        clearTimeout(resetTimer);
+        var files = e.originalEvent.dataTransfer.files;
 
-            $(".dropBox").on("drop", function (e) {
-                var files = e.originalEvent.dataTransfer.files;
+        console.log(files);
 
-                console.log(files);
-
-                var formData = new FormData();
-                for (let i = 0; i < files.length; i++)
-                {
-                    formData.append("fileToUpload[" + i + ']', files[i]);
+        var formData = new FormData();
+        for (let i = 0; i < files.length; i++) {
+          formData.append("fileToUpload["+i+']',files[i]);
+        }
+        var request = $.ajax({
+          type: "POST",
+          url: "http://tools.moonkop.com/uploadHandler.php",
+          data: formData,			//这里上传的数据使用了formData 对象
+          processData: false, 	//必须false才会自动加上正确的Content-Type
+          contentType: false,
+          dataType: 'json',
+          xhr: function(){
+            var xhr = $.ajaxSettings.xhr();
+            if (xhr.upload){
+              xhr.upload.addEventListener("progress",function(progressEvent){
+                console.log(progressEvent.total);
+                console.log(progressEvent.loaded);
+              },false);
+              return xhr;
+            }
+          },
+          success: function(e){
+            if (e.code == 100){
+              $('.dropBox-text').html("<div>上传成功辣</div><div>点我复制鸭</div>");
+              $('.dropBox').addClass("copible");
+              new ClipboardJS('.copible',{
+                text: function(){
+                  return $('.urls').text();
                 }
-                var request = $.ajax({
-                    type: "POST",
-                    url: "http://tools.moonkop.com/uploadHandler.php",
-                    data: formData,			//这里上传的数据使用了formData 对象
-                    processData: false, 	//必须false才会自动加上正确的Content-Type
-                    contentType: false,
-                    dataType: 'json',
-                    xhr: function () {
-                        var xhr = $.ajaxSettings.xhr();
-                        if (xhr.upload)
-                        {
-                            xhr.upload.addEventListener("progress", function (progressEvent) {
-                                console.log(progressEvent.total);
-                                console.log(progressEvent.loaded);
-                            }, false);
-                            return xhr;
-                        }
-                    },
-                    success: function (e) {
-                        if (e.code == 100)
-                        {
-                            $('.dropBox-text').html("<div>上传成功辣</div><div>点我复制鸭</div>");
-                            $('.dropBox').addClass("copible");
-                            new ClipboardJS('.copible', {
-                                text: function () {
-                                    return $('.urls').text();
-                                }
-                            });
-                            $('.urls').children().remove();
-                            e.payload.urls.forEach(item => {
-                                $('.urls').append(`<div>${item}</div>`)
+              });
+              $('.urls').children().remove();
+              e.payload.urls.forEach(item => {
+                $('.urls').append(`<div>${item}</div>`)
 
-                            })
-                        }
-                        else
-                        {
-                            alert(e.msg);
-                        }
-                    }
-                })
-                return false;
-
-            })
-
-            $(document).on({
-                drop: function (e) {
-                    return false;
-                },
-                dragleave: function (e) {
-                    e.preventDefault();
-                },
-                dragenter: function (e) {
-                    e.preventDefault();
-                },
-                dragover: function (e) {
-                    e.preventDefault();
-                },
-            })
-
+              })
+            }
+            else{
+              alert(e.msg);
+            }
+          }
         })
-	</script>
-	<style>
-		.dropBox {
-			width: 300px;
-			height: 300px;
-			position: relative;
-			border: 1px solid #ffd1d9;
-			border-radius: 37px;
-			background: #ffd1d9;
-			color: #FFF;
-			font-size: 30px;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-		}
+        return false;
 
-		.dropBox.copible {
-			cursor: pointer;
-		}
+      })
 
-		.dropBox.copible:active {
-			background: #e6bdc4;
-		}
+      $(document).on({
+        drop: function(e){
+          return false;
+        },
+        dragleave: function(e){
+          e.preventDefault();
+        },
+        dragenter: function(e){
+          e.preventDefault();
+        },
+        dragover: function(e){
+          e.preventDefault();
+        },
+      })
 
-		.dropBox .dropBox-text {
-			color: #FFF;
-			font-size: 30px;
-			text-align: center;
-			user-select: none;
-		}
+    })
+  </script>
+  <style>
+    .dropBox {
+      width: 300px;
+      height: 300px;
+      position: relative;
+      border: 1px solid #ffd1d9;
+      border-radius: 37px;
+      background: #ffd1d9;
+      color: #FFF;
+      font-size: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
 
-		.urls {
-			text-align: center;
-			margin: auto;
-			right: 0;
-			left: 0;
-			bottom: 100px;
-			color: #AAA;
-			font-size: 10px;
-		}
+    .dropBox.copible {
+      cursor: pointer;
+    }
 
-		.wrapper {
+    .dropBox.copible:active {
+      background: #e6bdc4;
+    }
 
-		}
+    .dropBox .dropBox-text {
+      color: #FFF;
+      font-size: 30px;
+      text-align: center;
+      user-select: none;
+    }
 
+    .urls {
+      text-align: center;
+      margin: auto;
+      right: 0;
+      left: 0;
+      bottom: 100px;
+      color: #AAA;
+      font-size: 10px;
+    }
 
-		body {
-			display: flex;
-			justify-content: center;
-			flex-direction: row;
-			align-items: center;
-		}
-	</style>
+    .wrapper {
+
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      flex-direction: row;
+      align-items: center;
+    }
+  </style>
 </head>
 <body>
 
 <div class="wrapper">
-	<div class="dropBox">
-		<div class="dropBox-text">
-			拖进来吧
-		</div>
+  <div class="dropBox">
+    <div class="dropBox-text">
+      拖进来吧
+    </div>
 
 
-	</div>
+  </div>
 
-	<div class="urls">
+  <div class="urls">
 
-	</div>
+  </div>
 </div>
 
 
