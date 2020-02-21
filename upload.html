@@ -10,82 +10,92 @@
   <script src="https://cdn.bootcss.com/clipboard.js/2.0.4/clipboard.js"></script>
   <script>
 
+    function upLoadFile(files) {
+      $(".dropBox").off('click')
+      console.log(files);
 
-    $(document).ready(function(){
+      var formData = new FormData();
+      for (let i = 0; i < files.length; i++) {
+        formData.append("fileToUpload[" + i + ']', files[i]);
+      }
+      var request = $.ajax({
+        type: "POST",
+        url: "/uploadHandler.php",
+        data: formData,			//这里上传的数据使用了formData 对象
+        processData: false, 	//必须false才会自动加上正确的Content-Type
+        contentType: false,
+        dataType: 'json',
+        xhr: function () {
+          var xhr = $.ajaxSettings.xhr();
+          if (xhr.upload) {
+            xhr.upload.addEventListener("progress", function (progressEvent) {
+              var percent = (progressEvent.loaded / progressEvent.total) * 100;
+              $(".dropBox").css("background", `linear-gradient(to top,#FFd1d9 ${percent}%,#FFF ${percent}%)`)
+              console.log(progressEvent.total);
+              console.log(progressEvent.loaded);
+            }, false);
+            return xhr;
+          }
+        },
+        success: function (e) {
+          if (e.code == 100) {
+            $('.dropBox-text').html("<div>上传成功辣</div><div>点我复制鸭</div>");
+            $('.dropBox').addClass("copible");
+            new ClipboardJS('.copible', {
+              text: function () {
+                return $('.urls').text();
+              }
+            });
+            $('.urls').children().remove();
+            e.payload.urls.forEach(item => {
+              $('.urls').append(`<div>${item}</div>`)
+
+            })
+          }
+          else {
+            alert(e.msg);
+          }
+        }
+      })
+    }
+    $(document).ready(function () {
       let resetTimer = 0;
-      $(".dropBox").on("dragenter",function(e){
+      $("#fileInput").on("change", function (e) {
+        upLoadFile(e.originalEvent.target.files);
+      })
+      $(".dropBox").on("click", function (e) {
+        $("#fileInput").click();
+      })
+      $(".dropBox").on("dragenter", function (e) {
         clearTimeout(resetTimer);
         $('.dropBox-text').html("<div>啊~疼~😭</div>");
       })
-      $(".dropBox").on("dragleave",function(e){
+      $(".dropBox").on("dragleave", function (e) {
         $('.dropBox-text').html("<div>吓死宝宝了~😣</div>");
         clearTimeout(resetTimer);
         resetTimer = setTimeout(() => {
           $('.dropBox-text').html("<div>拖进来吧</div>");
-        },1500)
+        }, 1500)
       })
-      $(".dropBox").on("drop",function(e){
+      $(".dropBox").on("drop", function (e) {
         clearTimeout(resetTimer);
         var files = e.originalEvent.dataTransfer.files;
-
-        console.log(files);
-
-        var formData = new FormData();
-        for (let i = 0; i < files.length; i++) {
-          formData.append("fileToUpload["+i+']',files[i]);
-        }
-        var request = $.ajax({
-          type: "POST",
-          url: "http://tools.moonkop.com/uploadHandler.php",
-          data: formData,			//这里上传的数据使用了formData 对象
-          processData: false, 	//必须false才会自动加上正确的Content-Type
-          contentType: false,
-          dataType: 'json',
-          xhr: function(){
-            var xhr = $.ajaxSettings.xhr();
-            if (xhr.upload){
-              xhr.upload.addEventListener("progress",function(progressEvent){
-                console.log(progressEvent.total);
-                console.log(progressEvent.loaded);
-              },false);
-              return xhr;
-            }
-          },
-          success: function(e){
-            if (e.code == 100){
-              $('.dropBox-text').html("<div>上传成功辣</div><div>点我复制鸭</div>");
-              $('.dropBox').addClass("copible");
-              new ClipboardJS('.copible',{
-                text: function(){
-                  return $('.urls').text();
-                }
-              });
-              $('.urls').children().remove();
-              e.payload.urls.forEach(item => {
-                $('.urls').append(`<div>${item}</div>`)
-
-              })
-            }
-            else{
-              alert(e.msg);
-            }
-          }
-        })
+        upLoadFile(files);
         return false;
 
       })
 
       $(document).on({
-        drop: function(e){
+        drop: function (e) {
           return false;
         },
-        dragleave: function(e){
+        dragleave: function (e) {
           e.preventDefault();
         },
-        dragenter: function(e){
+        dragenter: function (e) {
           e.preventDefault();
         },
-        dragover: function(e){
+        dragover: function (e) {
           e.preventDefault();
         },
       })
@@ -93,11 +103,15 @@
     })
   </script>
   <style>
+    body {
+      font-family: microsoft YaHei;
+    }
+
     .dropBox {
       width: 300px;
       height: 300px;
       position: relative;
-      border: 1px solid #ffd1d9;
+      border: 10px solid #ffd1d9;
       border-radius: 37px;
       background: #ffd1d9;
       color: #FFF;
@@ -129,11 +143,13 @@
       left: 0;
       bottom: 100px;
       color: #AAA;
-      font-size: 10px;
+      font-size: 12px;
     }
 
-    .wrapper {
+    .wrapper {}
 
+    #fileInput {
+      display: none;
     }
 
     body {
@@ -144,21 +160,20 @@
     }
   </style>
 </head>
+
 <body>
 
-<div class="wrapper">
-  <div class="dropBox">
-    <div class="dropBox-text">
-      拖进来吧
+  <div class="wrapper">
+    <div class="dropBox">
+      <div class="dropBox-text">
+        拖进来吧
+      </div>
     </div>
 
+    <div class="urls">
 
+    </div>
+    <div class="progress"></div>
   </div>
-
-  <div class="urls">
-
-  </div>
-</div>
-
-
+  <input id='fileInput' type="file" name="fileToUpload" />
 </body>
