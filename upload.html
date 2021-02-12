@@ -1,179 +1,260 @@
 <head>
-  <title>
-    拖上来吧
+	<title>
+		拖上来吧
 
-  </title>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+	</title>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1">
 
-  <script src="http://libs.baidu.com/jquery/2.0.0/jquery.js"></script>
-  <script src="https://cdn.bootcss.com/clipboard.js/2.0.4/clipboard.js"></script>
-  <script>
-
-    function upLoadFile(files) {
-      $(".dropBox").off('click')
-      console.log(files);
-
-      var formData = new FormData();
-      for (let i = 0; i < files.length; i++) {
-        formData.append("fileToUpload[" + i + ']', files[i]);
-      }
-      var request = $.ajax({
-        type: "POST",
-        url: "/uploadHandler.php",
-        data: formData,			//这里上传的数据使用了formData 对象
-        processData: false, 	//必须false才会自动加上正确的Content-Type
-        contentType: false,
-        dataType: 'json',
-        xhr: function () {
-          var xhr = $.ajaxSettings.xhr();
-          if (xhr.upload) {
-            xhr.upload.addEventListener("progress", function (progressEvent) {
-              var percent = (progressEvent.loaded / progressEvent.total) * 100;
-              $(".dropBox").css("background", `linear-gradient(to top,#FFd1d9 ${percent}%,#FFF ${percent}%)`)
-              console.log(progressEvent.total);
-              console.log(progressEvent.loaded);
-            }, false);
-            return xhr;
-          }
-        },
-        success: function (e) {
-          if (e.code == 100) {
-            $('.dropBox-text').html("<div>上传成功辣</div><div>点我复制鸭</div>");
-            $('.dropBox').addClass("copible");
-            new ClipboardJS('.copible', {
-              text: function () {
-                return $('.urls').text();
-              }
-            });
-            $('.urls').children().remove();
-            e.payload.urls.forEach(item => {
-              $('.urls').append(`<div>${item}</div>`)
-
-            })
-          }
-          else {
-            alert(e.msg);
-          }
+	<script src="http://libs.baidu.com/jquery/2.0.0/jquery.js"></script>
+	<script src="https://cdn.bootcss.com/clipboard.js/2.0.4/clipboard.js"></script>
+	<script>
+        function getType(obj){
+            return Object.prototype.toString.call(obj);
         }
-      })
-    }
-    $(document).ready(function () {
-      let resetTimer = 0;
-      $("#fileInput").on("change", function (e) {
-        upLoadFile(e.originalEvent.target.files);
-      })
-      $(".dropBox").on("click", function (e) {
-        $("#fileInput").click();
-      })
-      $(".dropBox").on("dragenter", function (e) {
-        clearTimeout(resetTimer);
-        $('.dropBox-text').html("<div>啊~疼~😭</div>");
-      })
-      $(".dropBox").on("dragleave", function (e) {
-        $('.dropBox-text').html("<div>吓死宝宝了~😣</div>");
-        clearTimeout(resetTimer);
-        resetTimer = setTimeout(() => {
-          $('.dropBox-text').html("<div>拖进来吧</div>");
-        }, 1500)
-      })
-      $(".dropBox").on("drop", function (e) {
-        clearTimeout(resetTimer);
-        var files = e.originalEvent.dataTransfer.files;
-        upLoadFile(files);
-        return false;
 
-      })
+        function buildParams(args){
+            let dict = {};
 
-      $(document).on({
-        drop: function (e) {
-          return false;
-        },
-        dragleave: function (e) {
-          e.preventDefault();
-        },
-        dragenter: function (e) {
-          e.preventDefault();
-        },
-        dragover: function (e) {
-          e.preventDefault();
-        },
-      })
+            function dfs(obj,prefix){
+                switch (getType(obj)){
+                    case '[object Array]':
+                        obj.map((item,index) => {
+                            switch (getType(item)){
+                                case '[object Array]':
+                                case '[object Object]':
+                                    dfs(item,prefix+'['+index+']');
+                                    break;
+                                default:
+                                    dict[prefix+'['+index+']'] = item;
+                            }
+                        })
+                        break;
+                    case '[object Object]':
+                        Object.keys(obj).map(key => {
+                            let keyname = prefix ? '['+key+']' : key
+                            switch (getType(obj[key])){
+                                case '[object Array]':
+                                case '[object Object]':
+                                    dfs(obj[key],prefix+keyname);
+                                    break;
+                                default:
+                                    dict[prefix+keyname] = obj[key];
+                            }
+                        });
+                        break;
+                }
+            }
 
-    })
-  </script>
-  <style>
-    body {
-      font-family: microsoft YaHei;
-    }
+            dfs(args,'');
+            return Object.keys(dict).map(key => {
+                return key+'='+dict[key];
+            }).join('&');
+        }
 
-    .dropBox {
-      width: 300px;
-      height: 300px;
-      position: relative;
-      border: 10px solid #ffd1d9;
-      border-radius: 37px;
-      background: #ffd1d9;
-      color: #FFF;
-      font-size: 30px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+        async function upLoadFile(files){
+            offBoxActions();
+            console.log(files);
 
-    .dropBox.copible {
-      cursor: pointer;
-    }
+            let checkResult = await new Promise((resolve,reject) => {
+                $.ajax({
+                    type: 'POST',
+                    url: "/uploadHandler.php?action=checkExist",
+                    dataType: 'json',
+                    data: buildParams({
+                        names: Array.from(files).map(item => item.name)
+                    }),
+                    success: (e) => {
+                        resolve(e.payload.exists);
+                    }
+                })
+            });
+            if (checkResult.length){
+                if (!confirm(checkResult.join(',')+' 这些文件已经在里面啦 要覆盖吗 ？')){
+                    return;
+                }
+            }
 
-    .dropBox.copible:active {
-      background: #e6bdc4;
-    }
+            var formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append("fileToUpload["+i+']',files[i]);
+            }
+            var request = $.ajax({
+                type: "POST",
+                url: "/uploadHandler.php?action=upload",
+                data: formData,			//这里上传的数据使用了formData 对象
+                processData: false, 	//必须false才会自动加上正确的Content-Type
+                contentType: false,
+                dataType: 'json',
+                xhr: function(){
+                    var xhr = $.ajaxSettings.xhr();
+                    if (xhr.upload){
+                        xhr.upload.addEventListener("progress",function(progressEvent){
+                            var percent = (progressEvent.loaded/progressEvent.total)*100;
+                            $(".dropBox").css("background",`linear-gradient(to top,#FFd1d9 ${percent}%,#FFF ${percent}%)`)
+                            console.log(progressEvent.total);
+                            console.log(progressEvent.loaded);
+                        },false);
+                        return xhr;
+                    }
+                },
+                success: function(e){
+                    if (e.code == 100){
+                        // $('.dropBox-text').html("<div>上传成功辣</div><div>点我复制鸭</div>");
+                        // $('.dropBox').addClass("copible");
+                        // new ClipboardJS('.copible',{
+                        //     text: function(){
+                        //         return $('.urls').text();
+                        //     }
+                        // });
+                        $('.urls').children().remove();
+                        e.payload.urls.forEach(item => {
+                            $('.urls').append(`<div>${item}</div>`)
 
-    .dropBox .dropBox-text {
-      color: #FFF;
-      font-size: 30px;
-      text-align: center;
-      user-select: none;
-    }
+                        })
+                        if (e.payload.overwrites.length){
+                            alert(e.payload.overwrites.join(',')+'已经被成功覆盖掉啦');
+                        }
+                    } else{
+                        alert(e.msg);
+                    }
+                    bindBoxActions();
+                },
+                error: function(e){
+                    alert('奇怪了 怎么就失败了呢？'+e.msg);
+                    bindBoxActions();
 
-    .urls {
-      text-align: center;
-      margin: auto;
-      right: 0;
-      left: 0;
-      bottom: 100px;
-      color: #AAA;
-      font-size: 12px;
-    }
+                }
+            })
+        }
 
-    .wrapper {}
+        function offBoxActions(){
+            $(".dropBox").off("click");
+            $(".dropBox").off("dragenter");
+            $(".dropBox").off("dragleave");
+            $(".dropBox").off("drop");
+        }
 
-    #fileInput {
-      display: none;
-    }
+        function bindBoxActions(){
+            let resetTimer = 0;
 
-    body {
-      display: flex;
-      justify-content: center;
-      flex-direction: row;
-      align-items: center;
-    }
-  </style>
+            $(".dropBox").on("click",function(e){
+                $("#fileInput").click();
+            })
+            $(".dropBox").on("dragenter",function(e){
+                clearTimeout(resetTimer);
+                $('.dropBox-text').html("<div>啊~疼~😭</div>");
+            })
+            $(".dropBox").on("dragleave",function(e){
+                $('.dropBox-text').html("<div>吓死宝宝了~😣</div>");
+                clearTimeout(resetTimer);
+                resetTimer = setTimeout(() => {
+                    $('.dropBox-text').html("<div>拖进来吧</div>");
+                },1500)
+            })
+            $(".dropBox").on("drop",function(e){
+                clearTimeout(resetTimer);
+                var files = e.originalEvent.dataTransfer.files;
+                upLoadFile(files);
+                return false;
+            })
+        }
+
+        $(document).ready(function(){
+            bindBoxActions();
+            $("#fileInput").on("change",function(e){
+                upLoadFile(e.originalEvent.target.files);
+            })
+            $(document).on({
+                drop: function(e){
+                    return false;
+                },
+                dragleave: function(e){
+                    e.preventDefault();
+                },
+                dragenter: function(e){
+                    e.preventDefault();
+                },
+                dragover: function(e){
+                    e.preventDefault();
+                },
+            })
+
+        })
+	</script>
+	<style>
+        body {
+            font-family: microsoft YaHei;
+        }
+
+        .dropBox {
+            width: 300px;
+            height: 300px;
+            position: relative;
+            border: 10px solid #ffd1d9;
+            border-radius: 37px;
+            background: #ffd1d9;
+            color: #FFF;
+            font-size: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .dropBox.copible {
+            cursor: pointer;
+        }
+
+        .dropBox.copible:active {
+            background: #e6bdc4;
+        }
+
+        .dropBox .dropBox-text {
+            color: #FFF;
+            font-size: 30px;
+            text-align: center;
+            user-select: none;
+        }
+
+        .urls {
+            text-align: center;
+            margin: auto;
+            right: 0;
+            left: 0;
+            bottom: 100px;
+            color: #AAA;
+            font-size: 12px;
+        }
+
+        .wrapper {
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            flex-direction: row;
+            align-items: center;
+        }
+	</style>
 </head>
 
 <body>
 
-  <div class="wrapper">
-    <div class="dropBox">
-      <div class="dropBox-text">
-        拖进来吧
-      </div>
-    </div>
+<div class="wrapper">
+	<div class="dropBox">
+		<div class="dropBox-text">
+			拖进来吧
+		</div>
+	</div>
 
-    <div class="urls">
+	<div class="urls">
 
-    </div>
-    <div class="progress"></div>
-  </div>
-  <input id='fileInput' type="file" name="fileToUpload" />
+	</div>
+	<div class="progress"></div>
+</div>
+<input id='fileInput' type="file" name="fileToUpload"/>
 </body>
