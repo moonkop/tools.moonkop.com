@@ -10,7 +10,7 @@ function retWrapper($payload, $code = 200, $msg = 'ok')
     ]);
 }
 
-$target_dir = "upload/";
+$root_dir = "upload";
 
 header('Access-Control-Allow-Origin:http://localhost:8080');
 
@@ -18,15 +18,14 @@ class Actions
 {
     public function upload()
     {
-        $cover = $_REQUEST['cover'];
-        $singleDir = $_REQUEST['singleDir'];
-
-        global $target_dir;
-
-        if ($singleDir) {
-            $target_dir .= time();
-        }
-
+        //$cover = $_REQUEST['cover'];
+       // $singleDir = $_REQUEST['singleDir'];
+        $path = $_REQUEST['path'];
+        global $root_dir;
+        $target_dir = $root_dir . $path . '/';
+//        if ($singleDir) {
+//            $target_dir .= time();
+//        }
         $existFiles = array();
         for ($i = 0; $i < count($_FILES["fileToUpload"]['error']); $i++) {
             $target_file = $target_dir . basename($_FILES["fileToUpload"]["name"][$i]);
@@ -39,7 +38,7 @@ class Actions
         $moveErrorNames = array();
         for ($i = 0; $i < count($_FILES["fileToUpload"]['error']); $i++) {
             $target_file = $target_dir . basename($_FILES["fileToUpload"]["name"][$i]);
-            if (!move_uploaded_file($_FILES["fileToUpload"]["tmp_name"][$i], $target_file)) {
+            if (!move_uploaded_file($_FILES["fileToUpload"]["tmp_name"][$i], $_SERVER['DOCUMENT_ROOT'] . '/' . $target_file)) {
                 $moveErrorNames[] = $_FILES["fileToUpload"]["name"][$i];
             } else {
                 $successFiles[] = $_FILES["fileToUpload"]["name"][$i];
@@ -67,10 +66,10 @@ class Actions
     public function checkExist()
     {
         $names = $_REQUEST['names'];
-        global $target_dir;
+        global $root_dir;
         $existFiles = [];
         for ($i = 0; $i < count($names); $i++) {
-            $target_file = $target_dir . $names[$i];
+            $target_file = $root_dir . $names[$i];
             if (file_exists($target_file)) {
                 $existFiles[] = $names[$i];
             }
@@ -83,33 +82,46 @@ class Actions
     public function fileList()
     {
         $dir = $_REQUEST['dir'];
-        $arr = scandir('./upload'.$dir);
+        $arr = scandir('./upload' . $dir);
         $ret = [];
         foreach ($arr as $item) {
             $obj = [
                 'name' => $item,
-                'is_dir' => is_dir($_SERVER['DOCUMENT_ROOT'].'/upload/'.$dir.'/'.$item)
+                'is_dir' => is_dir($_SERVER['DOCUMENT_ROOT'] . '/upload/' . $dir . '/' . $item)
             ];
             $ret[] = $obj;
 
         }
         retWrapper($ret);
     }
-    public function mkdir(){
+
+    public function mkdir()
+    {
         $name = $_REQUEST['path'];
-        mkdir('./upload'.$name,0555,true);
+        mkdir('./upload' . $name, 0777, true);
         retWrapper(null);
     }
 
-    public function delete()
+    public function deleteFile()
     {
         $path = $_REQUEST['path'];
-        rmdir('');
+        unlink($_SERVER['DOCUMENT_ROOT'] . '/upload/'.$path);
+        retWrapper(null);
     }
-    public function test(){
+
+    public function test()
+    {
         retWrapper();
 
     }
+}
+
+error_reporting(E_ALL);
+set_error_handler('handle_error');
+function handle_error($no, $msg, $file, $line)
+{
+    retWrapper(null, 500,$no.$msg);
+    exit();
 }
 
 $action = $_GET['action'];
